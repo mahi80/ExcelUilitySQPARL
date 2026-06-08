@@ -94,6 +94,41 @@ reachable, behind the login above.
 
 ---
 
+## Using it — upload any Excel
+
+Any `.xlsx` / `.xls` with tabular data works: each tab becomes a table, the tool
+infers the schema, you review/correct it, then you chat.
+
+**1 · Open & sign in** — go to http://localhost:8081 and log in (`admin` / `local_dev`).
+
+**2 · Upload** — click **+ New dataset → Choose Files**, pick **one or more** Excel
+files (they merge into one dataset), then **Profile workbook(s)**.
+- Optional: include a tab named **`data_dictionary`** (columns `table, column,
+  business_name, synonyms, unit, description`) and it's applied automatically.
+
+**3 · Review the inferred schema** — for each table, confirm/correct:
+- column **types** (e.g. a leading-zero code mis-read as a number),
+- the **primary key** and detected **foreign keys** (toggle cross-file FKs),
+- **untick** any sheet that isn't data (README, cover sheet, pivot),
+- add **business names / synonyms** per column and a **domain + glossary** up top
+  so the bot understands your terms (e.g. "stock" → `qoh`).
+Then click **Create dataset & continue** (builds tables, loads rows, indexes the schema).
+
+**4 · Chat** — ask in plain English. Three answer modes:
+- **SQL** (default): *"top 5 customers by revenue"*, *"how many orders in March?"*
+- **SPARQL** (graph): add *"via the ontology"* — needs a one-time
+  `docker restart exutil-ontop` after onboarding (SQL works immediately).
+- **Metrics** (deterministic): define KPIs under **Metrics**, then ask them by name.
+
+**5 · More** — switch datasets with the header **picker**; check answer quality under
+**Evals**; browse the dataset in the **OpenMetadata** catalog at http://localhost:8585.
+
+**Profiles best:** sheets with a header row followed by data rows (title/blank
+preludes are auto-detected). Messy layouts (merged cells, pivots, mis-typed columns)
+are exactly what the **Review** step is for — fix them there before creating the dataset.
+
+---
+
 ## Verifying M1
 
 | Check | How |
