@@ -10,7 +10,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16        # postgres 16 + pgvector (semantic schema index)
     container_name: exutil-postgres
     restart: unless-stopped
     env_file: .env
@@ -55,8 +55,14 @@ services:
       POSTGRES_RO_GROUP: ${POSTGRES_RO_GROUP:-app_ro}
       ARTIFACTS_DIR: /artifacts
       UPLOAD_DIR: /artifacts/uploads
+      OPENMETADATA_HOST: ${OPENMETADATA_HOST:-}
+      OPENMETADATA_JWT_TOKEN: ${OPENMETADATA_JWT_TOKEN:-}
+      OPENMETADATA_ADMIN_EMAIL: ${OPENMETADATA_ADMIN_EMAIL:-admin@open-metadata.org}
+      OPENMETADATA_ADMIN_PASSWORD: ${OPENMETADATA_ADMIN_PASSWORD:-admin}
     ports:
       - "${ONBOARDING_PORT:-8001}:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach the separate OpenMetadata stack
     volumes:
       - artifacts:/artifacts
     depends_on:

@@ -24,7 +24,9 @@ import psycopg2
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
+import catalog
 import ontop_combine
+import pageindex
 import registry
 from generators import build_artifact, generate_ddl
 from loader import load_workbook
@@ -198,9 +200,29 @@ def generate(req: GenerateRequest):
     except Exception:
         pass
 
+    # PageIndex: embed the schema into pgvector (best-effort; agent falls back to
+    # full context if unavailable).
+    indexed = 0
+    try:
+        rc = psycopg2.connect(POSTGRES_DSN)
+        indexed = pageindex.index_schema(rc, pid, profile)
+        rc.commit()
+        rc.close()
+    except Exception:
+        pass
+
+    # OpenMetadata: push the schema to the catalog (best-effort; opt-in via OPENMETADATA_HOST).
+    try:
+        if os.environ.get("OPENMETADATA_HOST"):
+            catalog.push_dataset(artifact["dataset_name"], schema, artifact["tables"],
+                                 artifact.get("domain"))
+    except Exception:
+        pass
+
     return {
         "ok": True,
         "project_id": pid,
+        "pageindex_rows": indexed,
         "dataset_name": artifact["dataset_name"],
         "schema": schema,
         "tables": list(loaded.keys()),
@@ -324,6 +346,17 @@ def add_metric(project_id: str, req: MetricRequest):
     finally:
         conn.close()
     return {"ok": True, "metric": metric}
+
+
+@app.post("/projects/{project_id}/catalog/push")
+def catalog_push(project_id: str):
+    """Push this project's schema to OpenMetadata (opt-in via OPENMETADATA_HOST)."""
+    path = _artifact_path(project_id)
+    if not path.exists():
+        raise HTTPException(404, "Project not found.")
+    art = json.loads(path.read_text(encoding="utf-8"))
+    return catalog.push_dataset(art.get("dataset_name"), art.get("schema"),
+                                art.get("tables", []), art.get("domain"))
 
 
 @app.delete("/projects/{project_id}/metrics/{metric_id}")

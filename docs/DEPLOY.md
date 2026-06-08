@@ -86,12 +86,36 @@ active project in the UI needs no restart.)
 - The agent, onboarding, Ontop, Postgres, and Redis ports must **not** be exposed
   publicly — only the UI (8080).
 
-## Not deployed (Phase-2, by design)
+## Phase-2 features
 
-- **OpenMetadata** — heavyweight (needs Elasticsearch + a metadata store). The
-  `meta.project` registry + the generated schema-context already cover
-  catalog/glossary/search for v1; wire OpenMetadata only if a richer catalog is
-  required.
-- **pgvector PageIndex** — at current dataset sizes the full schema-context
-  outperforms retrieval; add embedding-based schema-slice selection when datasets
-  grow large enough that the context no longer fits the model budget.
+### pgvector PageIndex (built-in)
+The Postgres image is `pgvector/pgvector:pg16`. At onboarding, each table/column is
+embedded (fastembed / BAAI/bge-small-en-v1.5, CPU; ~130 MB model downloaded on first
+use) into `meta.schema_embedding`. For **large** schemas (> `PAGEINDEX_MIN_COLUMNS`,
+default 40, or > 8 tables) the agent retrieves a focused schema slice per question via
+pgvector cosine; small schemas keep the full context. No config needed; tune with
+`PAGEINDEX_MIN_COLUMNS` / `PAGEINDEX_SLICE_TABLES`.
+
+### OpenMetadata catalog (opt-in)
+OpenMetadata runs as its **own** stack (it brings its own Postgres + Elasticsearch):
+
+```bash
+# from the repo root — uses the vendored official compose
+docker compose -f catalog/openmetadata.yml -p om up -d openmetadata-server
+# wait ~3-5 min; OM UI at http://localhost:8585 (admin@open-metadata.org / admin)
+```
+
+Then point onboarding at it so each onboarded dataset is pushed to the catalog
+(service → database → schema → tables → columns):
+
+```bash
+# in .env (the onboarding container reaches the separate OM stack via host-gateway):
+OPENMETADATA_HOST=http://host.docker.internal:8585
+docker compose up -d onboarding        # recreate to pick up the env
+```
+
+A dataset is pushed automatically on `/generate`, or on demand:
+`curl -XPOST http://localhost:8001/projects/<id>/catalog/push`. Leave
+`OPENMETADATA_HOST` blank to disable. OM is heavy (~3-4 GB RAM) — give the host
+enough memory, and remap OM's Postgres host port if 5432 is taken (the vendored
+compose uses 5435:5432).

@@ -29,6 +29,7 @@ import psycopg2
 import psycopg2.extras
 
 import config
+import retriever
 from metrics import fill_metric, match_metric
 from validators import validate as validate_sql_text
 from validators import validate_result_graph
@@ -78,6 +79,8 @@ TOKEN_BUDGET = int(os.environ.get("TOKEN_BUDGET_PER_QUERY", "8000"))
 MAX_REPAIR_ATTEMPTS = int(os.environ.get("MAX_REPAIR_ATTEMPTS", "2"))
 CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.7"))
 ONTOP_SPARQL_ENDPOINT = os.environ.get("ONTOP_SPARQL_ENDPOINT", "http://ontop:8080/sparql")
+# PageIndex kicks in only for large schemas (full context wins at small sizes).
+PAGEINDEX_MIN_COLUMNS = int(os.environ.get("PAGEINDEX_MIN_COLUMNS", "40"))
 
 
 def _trace(state: State, step: str, **fields):
@@ -111,9 +114,16 @@ def retrieve(state: State) -> dict:
                        "to create one, then ask questions about it."),
             "trace": state.get("trace", []),
         }
+    ctx = ds.schema_context
+    pageindex = "full-context"
+    total_cols = sum(len(v) for v in ds.known_columns.values())
+    if total_cols > PAGEINDEX_MIN_COLUMNS or len(ds.known_tables) > 8:
+        sl, picked = retriever.select_schema_slice(ds, state["question"])
+        if sl:
+            ctx, pageindex = sl, "slice:" + ",".join(picked)
     _trace(state, "retrieve", source="artifact", dataset=ds.dataset_name,
-           tables=len(ds.known_tables))
-    return {"sql_context": ds.schema_context, "sparql_context": ds.sparql_context,
+           tables=len(ds.known_tables), pageindex=pageindex)
+    return {"sql_context": ctx, "sparql_context": ds.sparql_context,
             "trace": state.get("trace", [])}
 
 

@@ -1,7 +1,7 @@
 # HANDOFF — ExcelUtilitySPARQL (M1–M3)
 
-**Status (2026-06-08):** **M1–M4 + the M5 `/evals` + deploy docs built and verified live in WSL
-Docker.** (M5's OpenMetadata + pgvector PageIndex are deferred to Phase-2, by design.)
+**Status (2026-06-08):** **M1–M5 + Phase-2 (PageIndex + OpenMetadata) built and verified live in
+WSL Docker.** Feature-complete against the design.
 
 - **M1** — one Excel → reviewed schema → SQL Q&A.
 - **M2** — multi-project (`meta.project` registry + isolated `ds_<id>` + UI picker) · data dictionary
@@ -21,11 +21,18 @@ Docker.** (M5's OpenMetadata + pgvector PageIndex are deferred to Phase-2, by de
   (Phase-2, by design):** OpenMetadata (heavyweight) and pgvector PageIndex (full schema-context
   beats retrieval at current sizes).
 
+- **Phase-2** — (a) **pgvector PageIndex**: Postgres on `pgvector/pgvector:pg16`; onboarding embeds
+  tables/columns (fastembed bge-small, `meta.schema_embedding`); the agent's `retrieve` retrieves a
+  semantic schema slice for large schemas (>40 cols / >8 tables), full context otherwise. (b)
+  **OpenMetadata**: runs as its own stack (`catalog/openmetadata.yml`, OM 1.12.10); `onboarding/catalog.py`
+  pushes service→database→schema→tables→columns (admin-login JWT, stdlib urllib); opt-in via `OPENMETADATA_HOST`.
+
 Offline: m1 (13) + m2m3 (11) + m3gen (15) + m4 (11) = **50/50**.
 Live verified: per-project SQL + SPARQL, FK→object-property traversal, synonym resolution, cross-file JOIN,
-RO sandbox, project switching, metric routing + param extraction + injection containment, and the `/evals`
-dashboard (avg 4.6/5 on bookstore; the judge even flagged an ungrounded insight).
-**Remaining: Phase-2 OpenMetadata + pgvector PageIndex.**
+RO sandbox, project switching, metric routing + param extraction + injection containment, `/evals`
+dashboard (avg 4.6/5), **PageIndex** (12-table schema → 6-table slice + correct join; small → full context),
+and **OpenMetadata** (12 tables + columns/types pushed to the catalog, verified via the OM API).
+**Feature-complete against the design.** Optional follow-ups: rotate the shared Anthropic key.
 
 ---
 ## (M1 record below)
