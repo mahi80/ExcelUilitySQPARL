@@ -15,6 +15,8 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import os
+import re
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -265,3 +267,78 @@ def project_delete(project_id: str):
     except Exception:
         pass
     return {"ok": True, "deleted": project_id}
+
+
+# ---------------------------------------------------------------------------
+# Config-driven metrics (M4)
+# ---------------------------------------------------------------------------
+
+_TEMPLATE_FORBIDDEN = re.compile(
+    r"\b(insert|update|delete|drop|alter|truncate|create|grant|merge|copy)\b|;", re.IGNORECASE)
+
+
+class MetricRequest(BaseModel):
+    name: str
+    description: str | None = None
+    synonyms: list[str] = []
+    sql_template: str
+    params: list[dict] = []          # [{name,type,default,values?}]
+
+
+def _artifact_path(pid: str) -> Path:
+    return ARTIFACTS_DIR / pid / "dataset.json"
+
+
+def _save_artifact(cur, pid: str, art: dict) -> None:
+    _artifact_path(pid).write_text(json.dumps(art, indent=2), encoding="utf-8")
+    cur.execute("UPDATE meta.project SET artifact=%s, updated_at=now() WHERE id=%s",
+                (json.dumps(art), pid))
+
+
+@app.get("/projects/{project_id}/metrics")
+def list_metrics(project_id: str):
+    path = _artifact_path(project_id)
+    if not path.exists():
+        raise HTTPException(404, "Project not found.")
+    return {"metrics": json.loads(path.read_text(encoding="utf-8")).get("metrics", [])}
+
+
+@app.post("/projects/{project_id}/metrics")
+def add_metric(project_id: str, req: MetricRequest):
+    if "select" not in req.sql_template.lower() or _TEMPLATE_FORBIDDEN.search(req.sql_template):
+        raise HTTPException(400, "Template must be a single SELECT (no DML/DDL, no ';').")
+    path = _artifact_path(project_id)
+    if not path.exists():
+        raise HTTPException(404, "Project not found.")
+    metric = {"id": "m_" + secrets.token_hex(3), "name": req.name,
+              "description": req.description, "synonyms": req.synonyms,
+              "sql_template": req.sql_template, "params": req.params}
+    conn = psycopg2.connect(POSTGRES_DSN)
+    conn.autocommit = False
+    try:
+        art = json.loads(path.read_text(encoding="utf-8"))
+        art.setdefault("metrics", []).append(metric)
+        with conn.cursor() as cur:
+            _save_artifact(cur, project_id, art)
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "metric": metric}
+
+
+@app.delete("/projects/{project_id}/metrics/{metric_id}")
+def delete_metric(project_id: str, metric_id: str):
+    path = _artifact_path(project_id)
+    if not path.exists():
+        raise HTTPException(404, "Project not found.")
+    conn = psycopg2.connect(POSTGRES_DSN)
+    conn.autocommit = False
+    try:
+        art = json.loads(path.read_text(encoding="utf-8"))
+        art["metrics"] = [m for m in art.get("metrics", []) if m.get("id") != metric_id]
+        with conn.cursor() as cur:
+            _save_artifact(cur, project_id, art)
+        conn.commit()
+    finally:
+        conn.close()
+    return {"ok": True, "deleted": metric_id}

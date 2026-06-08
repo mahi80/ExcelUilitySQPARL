@@ -1,6 +1,6 @@
 # HANDOFF — ExcelUtilitySPARQL (M1–M3)
 
-**Status (2026-06-08):** **M1, M2, and M3 built and verified live, end-to-end, in WSL Docker.**
+**Status (2026-06-08):** **M1–M4 built and verified live, end-to-end, in WSL Docker.**
 
 - **M1** — one Excel → reviewed schema → SQL Q&A.
 - **M2** — multi-project (`meta.project` registry + isolated `ds_<id>` + UI picker) · data dictionary
@@ -9,10 +9,15 @@
 - **M3** — auto-generated ontology + OBDA mapping + SHACL per dataset; ONE Ontop serves all projects via
   per-project IRI prefixes; agent SPARQL path (plan→generate→validate→execute→SHACL). SPARQL needs a
   manual `docker restart exutil-ontop` after onboarding (the chosen reload mechanism — no docker socket).
+- **M4** — config-driven metrics: per-dataset KPI templates (`/metrics` UI + onboarding CRUD, stored in the
+  artifact); planner routes a name/synonym match to `execute_metric` — deterministic param-fill (numbers/dates
+  auto-extracted, text matched to listed values, else default) → SELECT-only/allowlist validate → RO execute →
+  audited SQL. No LLM arithmetic. `agent/metrics.py` is the pure-Python core.
 
-Offline: `tests/test_offline_m1.py` (13) + `test_offline_m2m3.py` (11) + `test_offline_m3gen.py` (15) = 39/39.
+Offline: m1 (13) + m2m3 (11) + m3gen (15) + m4 (11) = **50/50**.
 Live verified: per-project SQL + SPARQL, FK→object-property traversal, synonym resolution, cross-file JOIN,
-RO sandbox, project switching. **Remaining: M4 (config-driven metrics), M5 (OpenMetadata + /evals + EC2).**
+RO sandbox, project switching, metric routing + param extraction + injection containment.
+**Remaining: M5 (OpenMetadata catalog optional + generic /evals + EC2 deploy + pgvector PageIndex).**
 
 ---
 ## (M1 record below)

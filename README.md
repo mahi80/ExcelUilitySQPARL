@@ -127,7 +127,9 @@ and trace **carry over** — just parameterised by the active dataset.
   multi-file merge into one dataset, data-dictionary editor (domain/synonyms/units).
 - **M3 ✅** — SPARQL via Ontop with **auto-generated** ontology/OBDA/SHACL per dataset
   (one Ontop serves all projects; `docker restart exutil-ontop` applies a new dataset).
-- **M4** — config-driven metrics (per-dataset KPIs + deterministic executor).
+- **M4 ✅** — config-driven metrics: per-dataset KPI templates (`/metrics` editor) computed
+  **deterministically** (no LLM arithmetic); the planner routes a matching question to the
+  metric executor (param-fill → validate → RO execute → audited SQL).
 - **M5** — OpenMetadata catalog (optional), generic `/evals`, EC2 deploy, pgvector PageIndex.
 
 ### SPARQL note

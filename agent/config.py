@@ -59,6 +59,11 @@ class Dataset:
     def row_counts(self) -> dict[str, int]:
         return self._d.get("row_counts", {})
 
+    @property
+    def metrics(self) -> list[dict]:
+        """Config-driven KPI definitions (M4)."""
+        return self._d.get("metrics", [])
+
     # M3 — SPARQL plane
     @property
     def ontology_ns(self) -> str | None:

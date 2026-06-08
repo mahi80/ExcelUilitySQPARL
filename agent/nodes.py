@@ -29,6 +29,7 @@ import psycopg2
 import psycopg2.extras
 
 import config
+from metrics import fill_metric, match_metric
 from validators import validate as validate_sql_text
 from validators import validate_result_graph
 from validators import validate_sparql as validate_sparql_text
@@ -49,6 +50,8 @@ class State(TypedDict, total=False):
     sql: str | None
     sparql: str | None
     shacl_report: dict[str, Any] | None
+    metric_id: str | None
+    metric_name: str | None
     validator_error: str | None
     validator_notes: list[str] | None
     repair_count: int
@@ -260,7 +263,14 @@ _SQL_HINTS = ("via sql", "as sql", "use sql")
 
 
 def plan_query(state: State) -> dict:
-    q = state["question"].lower()
+    raw = state["question"]
+    q = raw.lower()
+    ds = config.load_dataset(state.get("project"))
+    metric = match_metric(raw, ds.metrics if ds else [])
+    if metric:
+        _trace(state, "plan", target_lang="metric", reason=f"metric match: {metric['name']}")
+        return {"target_lang": "metric", "metric_id": metric["id"],
+                "metric_name": metric["name"], "trace": state["trace"]}
     if any(h in q for h in _SQL_HINTS):
         target, reason = "sql", "explicit SQL hint"
     elif any(h in q for h in _SPARQL_HINTS):
@@ -449,6 +459,45 @@ def execute_sparql(state: State) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Config-driven metric executor (M4) — deterministic, no LLM math
+# ---------------------------------------------------------------------------
+
+def execute_metric(state: State) -> dict:
+    ds = config.load_dataset(state.get("project"))
+    metric = next((m for m in (ds.metrics if ds else []) if m.get("id") == state.get("metric_id")), None)
+    if not metric:
+        _trace(state, "execute_metric", error="metric not found")
+        return {"validator_error": "Configured metric not found.", "trace": state["trace"]}
+
+    sql, perr = fill_metric(metric, state["question"])
+    if perr:
+        _trace(state, "execute_metric", error=perr)
+        return {"validator_error": perr, "trace": state["trace"]}
+
+    # Same SELECT-only / allowlist guard as the LLM SQL path — the template is
+    # author-supplied but params are rendered as safe literals.
+    r = validate_sql_text(sql, ds.known_tables, ds.known_columns)
+    if not r.ok:
+        _trace(state, "execute_metric", error=r.error, sql=sql[:200])
+        return {"validator_error": f"metric template rejected: {r.error}", "trace": state["trace"]}
+
+    started = time.perf_counter()
+    try:
+        with psycopg2.connect(POSTGRES_RO_DSN) as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(f'SET search_path TO "{ds.schema}", public')
+                cur.execute(r.sql)
+                rows = [dict(x) for x in cur.fetchall()]
+    except psycopg2.Error as e:
+        _trace(state, "execute_metric", error=str(e))
+        return {"execution_error": str(e), "trace": state["trace"]}
+
+    _trace(state, "execute_metric", metric=metric["name"], row_count=len(rows),
+           latency_ms=int((time.perf_counter() - started) * 1000))
+    return {"sql": r.sql, "rows": rows, "metric_name": metric["name"], "trace": state["trace"]}
+
+
+# ---------------------------------------------------------------------------
 # 7. Compose insights (grounded summary + insights + follow-ups)
 # ---------------------------------------------------------------------------
 
@@ -616,6 +665,10 @@ def compose(state: State) -> dict:
     follow_ups = state.get("follow_ups") or []
     parts: list[str] = []
 
+    if state.get("target_lang") == "metric" and state.get("metric_name"):
+        parts.append(f"### Metric · {state['metric_name']}\n"
+                     "_Computed deterministically — audited query below, no LLM arithmetic._")
+
     if summary:
         parts.append(f"### Summary\n{summary}")
     elif not rows:
@@ -663,7 +716,10 @@ def route_after_policy(state: State) -> str:
 
 
 def route_after_plan(state: State) -> str:
-    return "sparql" if state.get("target_lang") == "sparql" else "sql"
+    t = state.get("target_lang")
+    if t == "metric":
+        return "metric"
+    return "sparql" if t == "sparql" else "sql"
 
 
 def route_after_validate_sql(state: State) -> str:

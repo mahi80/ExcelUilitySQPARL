@@ -27,7 +27,7 @@
     .a-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 18px; box-shadow:0 2px 8px rgba(0,0,0,.03); }
     .a-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
     .badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; letter-spacing:.03em; }
-    .badge-sql { background:#dbeafe; color:#1e40af; } .badge-sparql { background:#ede9fe; color:#5b21b6; } .badge-policy { background:#fee2e2; color:#991b1b; } .badge-unknown { background:#f3f4f6; color:#6b7280; }
+    .badge-sql { background:#dbeafe; color:#1e40af; } .badge-sparql { background:#ede9fe; color:#5b21b6; } .badge-metric { background:#dcfce7; color:#166534; } .badge-policy { background:#fee2e2; color:#991b1b; } .badge-unknown { background:#f3f4f6; color:#6b7280; }
     .chip-meta { font-size:11px; color:var(--muted); }
     .answer { font-size:14px; line-height:1.6; }
     .answer h3 { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:16px 0 6px; }
@@ -64,7 +64,7 @@
       </select>
       <span class="ds">{{ dataset.tables|length }} tables</span>
     </div>
-    <div><a href="/upload">+ New dataset</a><a href="/logout">Sign out</a></div>
+    <div><a href="/metrics">Metrics</a><a href="/upload">+ New dataset</a><a href="/logout">Sign out</a></div>
   </header>
 
   <div id="chat">

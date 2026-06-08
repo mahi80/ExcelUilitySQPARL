@@ -17,6 +17,7 @@ from nodes import (
     State,
     compose,
     compose_insights,
+    execute_metric,
     execute_sparql,
     execute_sql,
     generate_sparql,
@@ -51,6 +52,7 @@ def build_graph():
     g.add_node("repair_prep", repair_prep)
     g.add_node("execute_sql", execute_sql)
     g.add_node("execute_sparql", execute_sparql)
+    g.add_node("execute_metric", execute_metric)
     g.add_node("compose_insights", compose_insights)
     g.add_node("compose", compose)
 
@@ -59,7 +61,8 @@ def build_graph():
     g.add_conditional_edges("policy_check", route_after_policy,
                             {"allow": "plan", "block": "compose"})
     g.add_conditional_edges("plan", route_after_plan,
-                            {"sql": "generate_sql", "sparql": "generate_sparql"})
+                            {"sql": "generate_sql", "sparql": "generate_sparql",
+                             "metric": "execute_metric"})
     g.add_edge("generate_sql", "validate_sql")
     g.add_edge("generate_sparql", "validate_sparql")
     g.add_conditional_edges("validate_sql", route_after_validate_sql,
@@ -73,6 +76,7 @@ def build_graph():
                             {"sql": "generate_sql", "sparql": "generate_sparql"})
     g.add_edge("execute_sql", "compose_insights")
     g.add_edge("execute_sparql", "compose_insights")
+    g.add_edge("execute_metric", "compose_insights")
     g.add_edge("compose_insights", "compose")
     g.add_edge("compose", END)
 

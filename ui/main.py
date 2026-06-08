@@ -137,6 +137,8 @@ def _message_context(q: str, data: dict, elapsed_ms: int) -> dict:
     answer_html = markdown.markdown(cleaned, extensions=["fenced_code", "tables"])
     if data.get("policy_block"):
         path_label, path_class = "POLICY BLOCK", "badge-policy"
+    elif (data.get("target_lang") or "") == "metric":
+        path_label, path_class = "METRIC", "badge-metric"
     elif (data.get("target_lang") or "") == "sparql":
         path_label, path_class = "SPARQL via Ontop", "badge-sparql"
     elif (data.get("target_lang") or "") == "sql":
@@ -365,6 +367,64 @@ async def activate_project(request: Request, project_id: str):
         return JSONResponse({"ok": False, "error": "auth"}, status_code=401)
     request.session["project"] = project_id
     return JSONResponse({"ok": True, "project": project_id})
+
+
+# --- config-driven metrics (M4) ----------------------------------------------
+@app.get("/metrics", response_class=HTMLResponse)
+async def metrics_page(request: Request, error: str | None = None):
+    if not _is_authed(request):
+        return RedirectResponse("/login", status_code=303)
+    project = request.session.get("project")
+    if not project:
+        return RedirectResponse("/", status_code=303)
+    metrics, ds = [], await _active_dataset(project)
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{ONBOARDING_URL}/projects/{project}/metrics")
+            metrics = r.json().get("metrics", [])
+    except Exception:
+        pass
+    return templates.TemplateResponse("metrics.html", {
+        "request": request, "user": request.session.get("user"), "project": project,
+        "dataset": ds, "metrics": metrics, "error": error})
+
+
+@app.post("/metrics/add")
+async def metrics_add(request: Request, name: str = Form(...), sql_template: str = Form(...),
+                      description: str = Form(""), synonyms: str = Form(""), params: str = Form("")):
+    if not _is_authed(request):
+        return RedirectResponse("/login", status_code=303)
+    project = request.session.get("project")
+    try:
+        parsed_params = json.loads(params) if params.strip() else []
+    except json.JSONDecodeError:
+        return RedirectResponse("/metrics?error=Params+must+be+valid+JSON+(or+blank)", status_code=303)
+    body = {"name": name, "description": description or None,
+            "synonyms": [s.strip() for s in synonyms.split(",") if s.strip()],
+            "sql_template": sql_template, "params": parsed_params}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            r = await client.post(f"{ONBOARDING_URL}/projects/{project}/metrics", json=body)
+            r.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        detail = e.response.json().get("detail", str(e)) if e.response else str(e)
+        return RedirectResponse(f"/metrics?error={detail}", status_code=303)
+    except Exception as e:  # noqa: BLE001
+        return RedirectResponse(f"/metrics?error={e}", status_code=303)
+    return RedirectResponse("/metrics", status_code=303)
+
+
+@app.post("/metrics/{metric_id}/delete")
+async def metrics_delete(request: Request, metric_id: str):
+    if not _is_authed(request):
+        return RedirectResponse("/login", status_code=303)
+    project = request.session.get("project")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.delete(f"{ONBOARDING_URL}/projects/{project}/metrics/{metric_id}")
+    except Exception:
+        pass
+    return RedirectResponse("/metrics", status_code=303)
 
 
 # --- chat ---------------------------------------------------------------------
