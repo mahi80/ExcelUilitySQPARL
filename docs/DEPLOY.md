@@ -1,16 +1,29 @@
-# DEPLOY — ExcelUtilitySPARQL on EC2
+# DEPLOY — ExcelUtilitySPARQL on AWS EC2 (or any Docker host)
 
-A single Docker host runs the whole stack (postgres, redis, onboarding, agent,
-ui, ontop). Suitable for a POC / internal demo. ~4 GB RAM is enough; Ontop (JVM)
-is the heaviest service.
+A single Docker host runs the whole stack (postgres, redis, onboarding, agent, ui,
+ontop). The same steps work on any Linux box with Docker — EC2, a GCP/Azure VM, or
+on-prem. OpenMetadata (optional) runs as its own stack.
+
+**TL;DR**
+```bash
+# on a fresh Ubuntu EC2 host with Docker installed:
+git clone https://github.com/mahi80/ExcelUilitySQPARL.git && cd ExcelUilitySQPARL
+curl -L -o ontop/postgresql-42.7.4.jar https://jdbc.postgresql.org/download/postgresql-42.7.4.jar
+cp .env.example .env            # set ANTHROPIC_API_KEY + change all passwords (see README → Credentials)
+docker compose up -d --build    # core stack → UI on :8080
+```
 
 ## 1. Provision
 
-- Ubuntu 22.04/24.04 EC2 instance (t3.medium or larger — 2 vCPU / 4 GB).
-- Security group: open **22** (SSH, your IP only) and **8080** (the UI). Keep
-  Postgres (5432), the agent (8000), onboarding (8001), and Ontop (8090)
-  **closed** to the internet — they're only needed inside the Docker network.
-- Attach enough EBS (20 GB+) for images + Postgres data.
+- Ubuntu 22.04/24.04 instance with Docker.
+- **Sizing:** core stack (no OpenMetadata) ≈ **4 GB RAM** → `t3.medium`. With
+  OpenMetadata (its own Postgres + Elasticsearch + server) budget **~8 GB** →
+  `t3.large`/`t3.xlarge`. Ontop (JVM) is the heaviest core service.
+- Security group: open **22** (SSH, your IP only) and **8080** (the UI; ideally only
+  via a TLS reverse proxy — see §8). Keep Postgres (5432), agent (8000), onboarding
+  (8001), Ontop (8090), Redis, and OpenMetadata (8585) **closed** to the internet —
+  they're only needed inside the Docker network / over SSH tunnels.
+- Attach enough EBS (20 GB+ core; 40 GB+ with OpenMetadata) for images + data.
 
 ## 2. Install Docker
 
@@ -85,6 +98,23 @@ active project in the UI needs no restart.)
 - **Rotate** any Anthropic key that has appeared in chat/logs.
 - The agent, onboarding, Ontop, Postgres, and Redis ports must **not** be exposed
   publicly — only the UI (8080).
+
+**TLS + public access:** don't expose 8080 directly. Front it with a reverse proxy
+that terminates HTTPS and forwards to the UI, e.g. Caddy (auto-Let's-Encrypt):
+
+```caddyfile
+your-host.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Then open only **443** (and 22) in the security group; bind the UI to localhost
+(`UI_PORT=127.0.0.1:8080`). An AWS ALB with an ACM cert works the same way.
+
+**Run on boot:** services use `restart: unless-stopped`, so `sudo systemctl enable
+docker` is enough for the stack to come back after a reboot. (OpenMetadata is a
+separate stack — start it with its own `docker compose -f catalog/openmetadata.yml
+-p om up -d` and it likewise restarts unless stopped.)
 
 ## Phase-2 features
 

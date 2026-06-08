@@ -181,6 +181,12 @@ ExcelUtilitySPARQL/
 The agent control-plane, validators, read-only sandbox, HTMX UI, SSE streaming,
 and trace **carry over** — just parameterised by the active dataset.
 
+## Docs
+
+- **[docs/BUILD_PLAN.md](docs/BUILD_PLAN.md)** — step-by-step plan to build this utility, with pros & cons of each decision.
+- **[docs/DEPLOY.md](docs/DEPLOY.md)** — run it on AWS EC2 (or any Docker host), incl. TLS + OpenMetadata.
+- **[docs/HANDOFF.md](docs/HANDOFF.md)** — current built/verified status.
+
 ## Roadmap
 
 - **M1 ✅** — one Excel → reviewed schema → SQL Q&A.
