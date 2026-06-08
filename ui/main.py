@@ -427,6 +427,42 @@ async def metrics_delete(request: Request, metric_id: str):
     return RedirectResponse("/metrics", status_code=303)
 
 
+# --- generic eval dashboard (M5) ---------------------------------------------
+@app.get("/evals", response_class=HTMLResponse)
+async def evals_page(request: Request):
+    if not _is_authed(request):
+        return RedirectResponse("/login", status_code=303)
+    project = request.session.get("project")
+    if not project:
+        return RedirectResponse("/", status_code=303)
+    summary = None
+    try:
+        raw = _get_redis().get(f"exutil:evals:{project}")
+        summary = json.loads(raw) if raw else None
+    except Exception:
+        pass
+    ds = await _active_dataset(project)
+    return templates.TemplateResponse("evals.html", {
+        "request": request, "user": request.session.get("user"),
+        "dataset": ds, "summary": summary})
+
+
+@app.post("/evals/run")
+async def evals_run(request: Request):
+    if not _is_authed(request):
+        return RedirectResponse("/login", status_code=303)
+    project = request.session.get("project")
+    try:
+        async with httpx.AsyncClient(timeout=240.0) as client:
+            r = await client.post(f"{AGENT_URL}/evals/run", json={"project": project})
+            r.raise_for_status()
+            summary = r.json()
+        _get_redis().set(f"exutil:evals:{project}", json.dumps(summary), ex=86400)
+    except Exception:
+        pass
+    return RedirectResponse("/evals", status_code=303)
+
+
 # --- chat ---------------------------------------------------------------------
 @app.post("/ask", response_class=HTMLResponse)
 async def ask(request: Request, q: str = Form(...)):

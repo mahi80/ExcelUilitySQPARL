@@ -1,6 +1,7 @@
 # HANDOFF — ExcelUtilitySPARQL (M1–M3)
 
-**Status (2026-06-08):** **M1–M4 built and verified live, end-to-end, in WSL Docker.**
+**Status (2026-06-08):** **M1–M4 + the M5 `/evals` + deploy docs built and verified live in WSL
+Docker.** (M5's OpenMetadata + pgvector PageIndex are deferred to Phase-2, by design.)
 
 - **M1** — one Excel → reviewed schema → SQL Q&A.
 - **M2** — multi-project (`meta.project` registry + isolated `ds_<id>` + UI picker) · data dictionary
@@ -14,10 +15,17 @@
   auto-extracted, text matched to listed values, else default) → SELECT-only/allowlist validate → RO execute →
   audited SQL. No LLM arithmetic. `agent/metrics.py` is the pure-Python core.
 
+- **M5 (partial)** — generic `/evals`: the agent auto-generates schema-derived questions + a metric,
+  runs them through the graph, and an LLM judge (`agent/evals.py`) scores correctness/grounding;
+  UI `/evals` dashboard (results stored in Redis). `docs/DEPLOY.md` is the EC2 playbook. **Deferred
+  (Phase-2, by design):** OpenMetadata (heavyweight) and pgvector PageIndex (full schema-context
+  beats retrieval at current sizes).
+
 Offline: m1 (13) + m2m3 (11) + m3gen (15) + m4 (11) = **50/50**.
 Live verified: per-project SQL + SPARQL, FK→object-property traversal, synonym resolution, cross-file JOIN,
-RO sandbox, project switching, metric routing + param extraction + injection containment.
-**Remaining: M5 (OpenMetadata catalog optional + generic /evals + EC2 deploy + pgvector PageIndex).**
+RO sandbox, project switching, metric routing + param extraction + injection containment, and the `/evals`
+dashboard (avg 4.6/5 on bookstore; the judge even flagged an ungrounded insight).
+**Remaining: Phase-2 OpenMetadata + pgvector PageIndex.**
 
 ---
 ## (M1 record below)

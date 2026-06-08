@@ -130,7 +130,10 @@ and trace **carry over** — just parameterised by the active dataset.
 - **M4 ✅** — config-driven metrics: per-dataset KPI templates (`/metrics` editor) computed
   **deterministically** (no LLM arithmetic); the planner routes a matching question to the
   metric executor (param-fill → validate → RO execute → audited SQL).
-- **M5** — OpenMetadata catalog (optional), generic `/evals`, EC2 deploy, pgvector PageIndex.
+- **M5 ◐** — generic **`/evals`** quality dashboard (auto-generated questions + LLM judge, any
+  dataset) ✅ and an EC2 **[DEPLOY.md](docs/DEPLOY.md)** ✅. **OpenMetadata** and **pgvector
+  PageIndex** are deferred to Phase-2 (the registry + generated schema-context cover catalog/
+  search at current scale — see DEPLOY.md "Not deployed").
 
 ### SPARQL note
 SPARQL runs over a single Ontop container serving every project via per-project IRI

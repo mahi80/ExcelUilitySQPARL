@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 import config
+import evals
 from graph import app_graph
 
 app = FastAPI(title="ExcelUtilitySPARQL Agent", version="0.1.0")
@@ -63,6 +64,39 @@ def dataset(project: str | None = None):
 def projects():
     """Ready projects for the UI picker."""
     return {"projects": config.list_projects()}
+
+
+class EvalRequest(BaseModel):
+    project: str | None = None
+    questions: list[str] | None = None
+
+
+@app.post("/evals/run")
+async def evals_run(req: EvalRequest):
+    """Generic quality eval: auto-generate questions from the dataset, run each
+    through the agent, and LLM-judge correctness + grounding."""
+    ds = config.load_dataset(req.project)
+    if ds is None:
+        return {"ok": False, "error": "No dataset onboarded."}
+    qs = req.questions or evals.build_eval_set(ds)
+    results: list[dict[str, Any]] = []
+    for q in qs:
+        try:
+            final = await app_graph.ainvoke(
+                {"question": q, "project": req.project, "trace": [], "repair_count": 0})
+        except Exception as e:  # noqa: BLE001
+            results.append({"question": q, "score": None, "reason": f"error: {e}"[:200]})
+            continue
+        query = final.get("sql") or final.get("sparql")
+        rows = final.get("rows") or []
+        v = evals.judge(q, final.get("answer") or "", query, rows)
+        results.append({
+            "question": q, "target_lang": final.get("target_lang"),
+            "row_count": len(rows), "query": query, "score": v.get("score"),
+            "grounded": v.get("grounded"), "relevant": v.get("relevant"),
+            "reason": v.get("reason") or v.get("error"),
+        })
+    return evals.summarize(ds.dataset_name, ds.project_id, results)
 
 
 def _payload(final: dict) -> dict:

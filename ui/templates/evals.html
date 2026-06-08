@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Evals — ExcelUtilitySPARQL</title>
+  <style>
+    :root { --bg:#f6f8fb; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2563eb; --border:#e5e7eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+    header { display:flex; justify-content:space-between; align-items:center; padding:14px 28px; background:#fff; border-bottom:1px solid var(--border); }
+    header .brand { font-weight:700; }
+    header a { color:var(--muted); text-decoration:none; font-size:13px; margin-left:16px; }
+    .wrap { max-width:960px; margin:28px auto 60px; padding:0 20px; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    p.sub { color:var(--muted); margin:0 0 18px; }
+    .scorecards { display:flex; gap:14px; margin-bottom:18px; }
+    .sc { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px 20px; flex:1; }
+    .sc .big { font-size:30px; font-weight:700; } .sc .lbl { color:var(--muted); font-size:12px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    th, td { text-align:left; padding:9px 12px; border-bottom:1px solid #f1f3f6; vertical-align:top; }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+    .pill { font-size:11px; padding:1px 7px; border-radius:6px; }
+    .s5,.s4 { background:#dcfce7; color:#166534; } .s3 { background:#fef9c3; color:#854d0e; } .s2,.s1 { background:#fee2e2; color:#991b1b; }
+    .no { color:#b91c1c; } .yes { color:#166534; }
+    button { padding:10px 18px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    .muted { color:var(--muted); font-size:12px; } code { font-size:11px; }
+    details summary { cursor:pointer; color:var(--muted); font-size:11px; }
+    pre { background:#0f172a; color:#e2e8f0; padding:8px; border-radius:6px; font-size:11px; overflow-x:auto; margin:6px 0 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><span class="brand">ExcelUtilitySPARQL</span> <span class="muted">evals · {{ dataset.dataset_name }}</span></div>
+    <div><a href="/">← Chat</a><a href="/logout">Sign out</a></div>
+  </header>
+  <div class="wrap">
+    <h1>Quality evaluation</h1>
+    <p class="sub">Auto-generates questions from this dataset, runs them through the bot, and has an LLM judge score each answer for correctness + grounding. Generic — works on any uploaded dataset.</p>
+
+    <form method="post" action="/evals/run" onsubmit="this.querySelector('button').textContent='Running… (~1 min)'; this.querySelector('button').disabled=true;">
+      <button type="submit">{{ 'Re-run evaluation' if summary else 'Run evaluation' }}</button>
+      <span class="muted" style="margin-left:10px;">runs ~6 schema-derived questions + any defined metric</span>
+    </form>
+
+    {% if summary %}
+    <div class="scorecards" style="margin-top:20px;">
+      <div class="sc"><div class="big">{{ summary.avg_score if summary.avg_score is not none else '—' }}</div><div class="lbl">avg score / 5</div></div>
+      <div class="sc"><div class="big">{{ (summary.pass_rate * 100)|round|int if summary.pass_rate is not none else '—' }}%</div><div class="lbl">pass rate (score ≥ 4)</div></div>
+      <div class="sc"><div class="big">{{ summary.n }}</div><div class="lbl">questions</div></div>
+    </div>
+    <table>
+      <thead><tr><th>question</th><th>path</th><th>rows</th><th>score</th><th>grounded</th><th>judge reason</th></tr></thead>
+      <tbody>
+        {% for r in summary.results %}
+        <tr>
+          <td>{{ r.question }}{% if r.query %}<details><summary>query</summary><pre>{{ r.query }}</pre></details>{% endif %}</td>
+          <td class="muted">{{ r.target_lang or '—' }}</td>
+          <td>{{ r.row_count if r.row_count is not none else '—' }}</td>
+          <td>{% if r.score is not none %}<span class="pill s{{ r.score }}">{{ r.score }}</span>{% else %}<span class="muted">n/a</span>{% endif %}</td>
+          <td>{% if r.grounded is none %}<span class="muted">—</span>{% elif r.grounded %}<span class="yes">yes</span>{% else %}<span class="no">no</span>{% endif %}</td>
+          <td class="muted">{{ r.reason or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted" style="margin-top:20px;">No evaluation run yet for this dataset. Click <b>Run evaluation</b> above.</p>
+    {% endif %}
+  </div>
+</body>
+</html>
