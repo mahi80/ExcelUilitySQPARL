@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review schema — ExcelUtilitySPARQL</title>
+  <style>
+    :root { --bg:#f6f8fb; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2563eb; --border:#e5e7eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+    header { display:flex; justify-content:space-between; align-items:center; padding:14px 28px; background:#fff; border-bottom:1px solid var(--border); position:sticky; top:0; z-index:5; }
+    header .brand { font-weight:700; }
+    header a { color:var(--muted); text-decoration:none; font-size:13px; margin-left:16px; }
+    .wrap { max-width:1040px; margin:28px auto 80px; padding:0 20px; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    p.sub { color:var(--muted); margin:0 0 20px; }
+    .steps { display:flex; gap:8px; margin-bottom:20px; font-size:12px; color:var(--muted); }
+    .steps span { background:#eef2ff; color:#3730a3; padding:4px 10px; border-radius:99px; }
+    .steps span.done { background:#dcfce7; color:#166534; }
+    .tbl { background:var(--card); border:1px solid var(--border); border-radius:12px; margin-bottom:18px; overflow:hidden; }
+    .tbl.excluded { opacity:.5; }
+    .thead { display:flex; align-items:center; gap:14px; padding:14px 18px; background:#fbfcfe; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .thead .tname { font-weight:650; font-size:15px; }
+    .thead .meta { color:var(--muted); font-size:12px; }
+    .thead .ctrl { margin-left:auto; display:flex; gap:14px; align-items:center; font-size:12px; color:var(--muted); }
+    .thead select, .thead input { font-size:12px; padding:4px 6px; border:1px solid var(--border); border-radius:6px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { text-align:left; padding:8px 18px; border-bottom:1px solid #f1f3f6; }
+    th { color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+    td.samples { color:var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size:11px; }
+    select.type { padding:4px 6px; border:1px solid var(--border); border-radius:6px; font-size:12px; }
+    .fk { display:inline-flex; align-items:center; gap:5px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:11px; margin:0 8px 12px 18px; cursor:pointer; }
+    .dataset-meta { background:#fff; border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin-bottom:18px; display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .fld { display:flex; flex-direction:column; gap:6px; font-size:12px; color:var(--muted); }
+    .fld textarea { font-size:13px; padding:8px; border:1px solid var(--border); border-radius:8px; resize:vertical; font-family:inherit; color:var(--ink); }
+    .fld-label { font-size:12px; color:var(--muted); display:block; margin-bottom:6px; }
+    .gloss-row { display:flex; gap:8px; margin-bottom:6px; }
+    .gloss-row input { flex:1; font-size:12px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; }
+    .tbl-desc { width:100%; box-sizing:border-box; padding:8px 18px; border:none; border-bottom:1px solid var(--border); font-size:12px; color:var(--ink); background:#fbfcfe; }
+    td.dict { min-width:210px; }
+    td.dict input { width:100%; box-sizing:border-box; font-size:11px; padding:3px 6px; border:1px solid var(--border); border-radius:5px; margin-bottom:3px; }
+    td.dict details summary { font-size:10px; color:var(--muted); cursor:pointer; }
+    .bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--border); padding:14px 28px; display:flex; justify-content:space-between; align-items:center; }
+    button { padding:11px 22px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    button:hover { background:#1d4ed8; }
+    .err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:16px; }
+    .hint { background:#fffbeb; color:#92400e; border:1px solid #fde68a; padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:18px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">ExcelUtilitySPARQL</div>
+    <div><a href="/upload">Re-upload</a><a href="/logout">Sign out</a></div>
+  </header>
+  <form method="post" action="/finalize">
+  <div class="wrap">
+    <div class="steps"><span class="done">1 · Upload ✓</span><span>2 · Review schema</span><span style="opacity:.5">3 · Chat</span></div>
+    <h1>Review the inferred schema</h1>
+    <p class="sub">From <b>{{ profile.source_file }}</b> — {{ profile.tables|length }} table(s). Confirm types and keys, add business names/synonyms so the bot understands your terms, and untick any sheet that isn't data (e.g. a README).</p>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <div class="hint">Types, keys, and relationships were inferred from the data. Inference is a starting point — correct anything that looks off before creating the dataset.</div>
+
+    <div class="dataset-meta">
+      <label class="fld"><span>Domain — what is this data about?</span>
+        <textarea name="ds_domain" rows="2" placeholder="e.g. Azure cloud cost & resource inventory for FY2026">{{ profile.domain or '' }}</textarea></label>
+      <div class="gloss">
+        <span class="fld-label">Glossary (optional — business terms the bot should know)</span>
+        {% for i in range(3) %}
+        {% set g = profile.glossary[i] if profile.glossary and profile.glossary|length > i else None %}
+        <div class="gloss-row">
+          <input name="glossary_{{ i }}_term" placeholder="term (e.g. churn)" value="{{ g.term if g else '' }}">
+          <input name="glossary_{{ i }}_def" placeholder="definition" value="{{ g.definition if g else '' }}">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% for t in profile.tables %}
+    {% set ti = loop.index0 %}
+    <div class="tbl" id="tbl-{{ ti }}">
+      <div class="thead">
+        <label><input type="checkbox" name="tbl_{{ ti }}_include" {% if t.include is not defined or t.include %}checked{% endif %} onchange="document.getElementById('tbl-{{ ti }}').classList.toggle('excluded', !this.checked)"></label>
+        <span class="tname">{{ t.name }}</span>
+        <span class="meta">sheet “{{ t.sheet }}” · {{ t.row_count }} rows{% if t.source_file %} · <b>{{ t.source_file }}</b>{% endif %}</span>
+        <div class="ctrl">
+          <span title="Auto-detected header row">header row: {{ t.header_row }}</span>
+          <label>primary key
+            <select name="tbl_{{ ti }}_pk">
+              {% for c in t.columns %}
+                <option value="{{ c.name }}" {% if not t.synth_pk and t.pk == c.name %}selected{% endif %}>{{ c.name }}</option>
+              {% endfor %}
+              <option value="__synth__" {% if t.synth_pk %}selected{% endif %}>(synthesize surrogate key)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <input class="tbl-desc" name="tbl_{{ ti }}_desc" value="{{ t.description or '' }}" placeholder="Optional: what this table represents (helps the bot)">
+      <table>
+        <thead><tr><th>use</th><th>column</th><th>type</th><th>nullable</th><th>distinct</th><th>samples</th><th>business name &amp; synonyms</th></tr></thead>
+        <tbody>
+          {% for c in t.columns %}
+          {% set ci = loop.index0 %}
+          <tr>
+            <td><input type="checkbox" name="col_{{ ti }}_{{ ci }}_include" {% if c.include is not defined or c.include %}checked{% endif %}></td>
+            <td><b>{{ c.name }}</b></td>
+            <td>
+              <select class="type" name="col_{{ ti }}_{{ ci }}_type">
+                {% for lt in logical_types %}<option value="{{ lt }}" {% if c.type == lt %}selected{% endif %}>{{ lt }}</option>{% endfor %}
+              </select>
+            </td>
+            <td>{{ "yes" if c.nullable else "no" }}</td>
+            <td>{{ c.distinct }}</td>
+            <td class="samples">{{ c.samples[:4]|join(", ") }}</td>
+            <td class="dict">
+              <input name="col_{{ ti }}_{{ ci }}_bn" placeholder="business name" value="{{ c.business_name or '' }}">
+              <input name="col_{{ ti }}_{{ ci }}_syn" placeholder="synonyms (comma-sep)" value="{{ c.synonyms|join(', ') if c.synonyms else '' }}">
+              <details><summary>more</summary>
+                <input name="col_{{ ti }}_{{ ci }}_unit" placeholder="unit (e.g. USD)" value="{{ c.unit or '' }}">
+                <input name="col_{{ ti }}_{{ ci }}_desc" placeholder="description" value="{{ c.description or '' }}">
+              </details>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% for fk in t.fks %}{% set fi = loop.index0 %}<label class="fk"><input type="checkbox" name="fk_{{ ti }}_{{ fi }}_include" {% if fk.include is not defined or fk.include %}checked{% endif %}> {{ fk.column }} → {{ fk.ref_table }}.{{ fk.ref_column }}</label>{% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <div class="bar">
+    <span style="color:var(--muted);font-size:13px;">Creating the dataset builds the tables, loads the rows, and indexes the schema for the chatbot.</span>
+    <button type="submit">Create dataset &amp; continue →</button>
+  </div>
+  </form>
+</body>
+</html>

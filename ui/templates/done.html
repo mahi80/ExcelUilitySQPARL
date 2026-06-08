@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dataset ready — ExcelUtilitySPARQL</title>
+  <style>
+    :root { --bg:#f6f8fb; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2563eb; --border:#e5e7eb; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--ink); }
+    header { display:flex; justify-content:space-between; align-items:center; padding:14px 28px; background:#fff; border-bottom:1px solid var(--border); }
+    header .brand { font-weight:700; }
+    header a { color:var(--muted); text-decoration:none; font-size:13px; margin-left:16px; }
+    .wrap { max-width:680px; margin:48px auto; padding:0 20px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:32px; box-shadow:0 10px 30px rgba(0,0,0,.05); }
+    .check { width:46px; height:46px; border-radius:50%; background:#dcfce7; color:#166534; display:flex; align-items:center; justify-content:center; font-size:24px; margin-bottom:16px; }
+    h1 { font-size:22px; margin:0 0 6px; }
+    p.sub { color:var(--muted); margin:0 0 22px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; margin-bottom:8px; }
+    td { padding:7px 0; border-bottom:1px solid #f1f3f6; }
+    td.r { text-align:right; color:var(--muted); }
+    a.btn { display:inline-block; margin-top:24px; padding:11px 22px; background:var(--accent); color:#fff; text-decoration:none; border-radius:8px; font-size:14px; font-weight:600; }
+    a.btn:hover { background:#1d4ed8; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">ExcelUtilitySPARQL</div>
+    <div><a href="/logout">Sign out</a></div>
+  </header>
+  <div class="wrap">
+    <div class="card">
+      <div class="check">✓</div>
+      <h1>Dataset “{{ result.dataset_name }}” is ready</h1>
+      <p class="sub">Loaded {{ result.total_rows }} rows across {{ result.tables|length }} tables into schema <code>{{ result.schema }}</code>.</p>
+      <table>
+        {% for tname, n in result.row_counts.items() %}
+        <tr><td>{{ tname }}</td><td class="r">{{ n }} rows</td></tr>
+        {% endfor %}
+      </table>
+      <a class="btn" href="/">Start chatting →</a>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — ExcelUtilitySPARQL</title>
+  <style>
+    :root { --bg:#f6f8fb; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2563eb; --border:#e5e7eb; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--ink); display:flex; min-height:100vh; align-items:center; justify-content:center; }
+    .card { background: var(--card); border:1px solid var(--border); border-radius:14px; padding:36px 32px;
+            width:360px; box-shadow: 0 10px 30px rgba(0,0,0,.06); }
+    h1 { font-size:20px; margin:0 0 4px; }
+    p.sub { color: var(--muted); margin:0 0 24px; font-size:13px; }
+    label { display:block; font-size:13px; margin:14px 0 6px; color:var(--muted); }
+    input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; }
+    button { width:100%; margin-top:22px; padding:11px; background:var(--accent); color:#fff; border:none;
+             border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; }
+    button:hover { background:#1d4ed8; }
+    .err { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; padding:9px 12px; border-radius:8px;
+           font-size:13px; margin-top:16px; }
+  </style>
+</head>
+<body>
+  <form class="card" method="post" action="/login">
+    <h1>ExcelUtilitySPARQL</h1>
+    <p class="sub">Upload a spreadsheet, chat with your data.</p>
+    <label for="username">Username</label>
+    <input id="username" name="username" autocomplete="username" autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password">
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <button type="submit">Sign in</button>
+  </form>
+</body>
+</html>

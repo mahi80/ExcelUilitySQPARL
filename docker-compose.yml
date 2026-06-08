@@ -1,0 +1,159 @@
+# ExcelUtilitySPARQL — M1 stack.
+#
+#   docker compose up -d --build
+#
+# Then open http://localhost:8080 → log in → upload an Excel workbook →
+# review the inferred schema → finalise → ask questions.
+#
+# The `artifacts` volume is the seam between planes: onboarding WRITES the
+# generated dataset.json there; the agent READS it (read-only).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: exutil-postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_RO_USER: ${POSTGRES_RO_USER}
+      POSTGRES_RO_PASSWORD: ${POSTGRES_RO_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: exutil-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-127.0.0.1:6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  onboarding:
+    build: ./onboarding
+    container_name: exutil-onboarding
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DSN: ${POSTGRES_DSN}
+      POSTGRES_RO_GROUP: ${POSTGRES_RO_GROUP:-app_ro}
+      ARTIFACTS_DIR: /artifacts
+      UPLOAD_DIR: /artifacts/uploads
+    ports:
+      - "${ONBOARDING_PORT:-8001}:8001"
+    volumes:
+      - artifacts:/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health', timeout=2).getcode()==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  agent:
+    build: ./agent
+    container_name: exutil-agent
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL}
+      POSTGRES_RO_DSN: ${POSTGRES_RO_DSN}
+      ARTIFACTS_DIR: /artifacts
+      DEFAULT_PROJECT: ${DEFAULT_PROJECT:-}
+      CONFIDENCE_THRESHOLD: ${CONFIDENCE_THRESHOLD}
+      MAX_REPAIR_ATTEMPTS: ${MAX_REPAIR_ATTEMPTS}
+      TOKEN_BUDGET_PER_QUERY: ${TOKEN_BUDGET_PER_QUERY}
+      ONTOP_SPARQL_ENDPOINT: ${ONTOP_SPARQL_ENDPOINT:-http://ontop:8080/sparql}
+    ports:
+      - "${AGENT_PORT:-8000}:8000"
+    volumes:
+      - artifacts:/artifacts:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=2).getcode()==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ontop:
+    build: ./ontop
+    container_name: exutil-ontop
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ONTOP_MAPPING_FILE:    /opt/ontop/input/ontop/mapping.obda
+      ONTOP_ONTOLOGY_FILE:   /opt/ontop/input/ontop/ontology.ttl
+      ONTOP_PROPERTIES_FILE: /opt/ontop/input/ontop/ontop.properties
+      ONTOP_PORT:            "8080"
+      ONTOP_CORS_ALLOWED_ORIGINS: "*"
+      ONTOP_DB_USER:     ${POSTGRES_RO_USER}
+      ONTOP_DB_PASSWORD: ${POSTGRES_RO_PASSWORD}
+    ports:
+      - "${ONTOP_PORT:-8090}:8080"
+    volumes:
+      - artifacts:/opt/ontop/input          # combined config written under /ontop by onboarding
+    depends_on:
+      postgres:
+        condition: service_healthy
+      onboarding:
+        condition: service_healthy           # ensures the combined config is seeded first
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  ui:
+    build: ./ui
+    container_name: exutil-ui
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AGENT_URL: ${AGENT_URL:-http://agent:8000}
+      ONBOARDING_URL: ${ONBOARDING_URL:-http://onboarding:8001}
+      UI_AUTH_USER: ${UI_AUTH_USER}
+      UI_AUTH_PASSWORD: ${UI_AUTH_PASSWORD}
+      UI_SESSION_SECRET: ${UI_SESSION_SECRET}
+      REDIS_URL: ${REDIS_URL}
+    ports:
+      - "${UI_PORT:-8080}:8080"
+    depends_on:
+      agent:
+        condition: service_started
+      onboarding:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/health', timeout=2).getcode()==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+volumes:
+  postgres_data:
+  redis_data:
+  artifacts:

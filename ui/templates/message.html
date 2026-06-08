@@ -1,0 +1,33 @@
+<div class="message">
+  <div class="q-row"><div class="q-bubble">{{ q }}</div></div>
+  <div class="a-card">
+    <div class="a-head">
+      <span class="badge {{ path_class }}">{{ path_label }}</span>
+      {% if confidence is not none %}<span class="chip-meta">confidence {{ "%.2f"|format(confidence) }}</span>{% endif %}
+      {% if repair_count %}<span class="chip-meta">{{ repair_count }} repair(s)</span>{% endif %}
+      <span class="chip-meta" style="margin-left:auto;">{{ elapsed_ms }} ms</span>
+    </div>
+    <div class="answer">{{ answer_html|safe }}</div>
+
+    {% if follow_up_chips %}
+    <div class="chips">
+      {% for c in follow_up_chips %}<button class="chip" onclick="askChip(this)">{{ c }}</button>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if trace_view %}
+    <details class="trace">
+      <summary>Pipeline trace ({{ trace_view|length }} steps)</summary>
+      <div class="trace-body">
+        {% for s in trace_view %}
+        <div class="trace-step{% if s.is_llm %} llm{% endif %}">
+          <span class="ts-icon">{{ s.icon }}</span>
+          <span class="ts-label">{{ s.label }}</span>
+          <span class="ts-pills">{% for p in s.pills %}<span class="pill">{{ p.k }}: {{ p.v }}</span>{% endfor %}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>

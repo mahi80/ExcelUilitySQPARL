@@ -1,0 +1,2 @@
+# JDBC driver jar is fetched into the build context, not committed.
+postgresql-*.jar
