@@ -68,6 +68,32 @@ then:
 
 ---
 
+## Credentials
+
+> ⚠️ **These are local POC defaults for a localhost-only stack.** Change every one
+> (and never expose the ports publicly) before any shared/real deployment. They all
+> live in `.env` — edit there to change them. The **Anthropic API key** is also in
+> `.env` (`ANTHROPIC_API_KEY`) and is intentionally **not** listed here — keep it
+> secret and rotate it if it ever leaks.
+
+| Service | URL | Username | Password | `.env` keys |
+|---|---|---|---|---|
+| **Web UI** (chat / login) | http://localhost:8081 | `admin` | `local_dev` | `UI_AUTH_USER` / `UI_AUTH_PASSWORD` |
+| **OpenMetadata** (catalog, opt-in) | http://localhost:8585 | `admin@open-metadata.org` | `admin` | OM stack defaults |
+| **Postgres** — owner (DDL + load) | `localhost:5433` | `excelutil` | `local_dev_pw` | `POSTGRES_USER` / `POSTGRES_PASSWORD` |
+| **Postgres** — read-only (agent sandbox) | `localhost:5433` | `app_ro_user` | `local_dev_ro` | `POSTGRES_RO_USER` / `POSTGRES_RO_PASSWORD` |
+
+Ports above are this demo's values (remapped in `.env` to run beside another stack).
+A fresh `cp .env.example .env` uses the example defaults instead — UI `admin` /
+`change_me`, Postgres `excelutil` / `change_me_in_real_env`, UI on **8080**,
+Postgres on **5432** — which you should change as noted above.
+
+Redis (`localhost:6380`) and the agent/onboarding/Ontop APIs have **no** auth — they
+are not meant to be exposed; only the Web UI (and optionally OpenMetadata) should be
+reachable, behind the login above.
+
+---
+
 ## Verifying M1
 
 | Check | How |
